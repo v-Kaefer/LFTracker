@@ -5,7 +5,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt
 
-# Map exemple: packages -> sectors
+# Map example: packages -> sectors
 SECTOR_MAP = {
     "vlc": "Media",
     "ffmpeg": "Media",
@@ -18,7 +18,7 @@ SECTOR_MAP = {
     "python": "Development",
     "gcc": "Development",
     "make": "Development",
-    # Default: "Outros"
+    # Default: "Others"
 }
 
 
@@ -88,7 +88,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("lftracker - Lightweight Package Tracker")
+        self.setWindowTitle("LFTracker - Lightweight Package Tracker")
         self.resize(800, 600)
 
         self.all_packages = {}  # sector -> [widgets]
