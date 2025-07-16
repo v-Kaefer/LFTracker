@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=LFTracker
+Comment=A Tracker for used and unused packages in linux.
+Exec=lftracker
+Icon=utilities-system-monitor
+Terminal=false
+Type=Application
+Categories=System;Utility;
+StartupNotify=true

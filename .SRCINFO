@@ -1,0 +1,18 @@
+pkgbase = lftracker
+	pkgdesc = A Tracker for used and unused packages in linux.
+	pkgver = 0.1.0
+	pkgrel = 1
+	url = https://github.com/v-Kaefer/LFTracker
+	arch = any
+	license = MIT
+	depends = python
+	depends = python-pyqt5
+	depends = pacman-contrib
+	source = main.py
+	source = ui.py
+	source = lftracker.desktop
+	md5sums = SKIP
+	md5sums = SKIP
+	md5sums = SKIP
+
+pkgname = lftracker

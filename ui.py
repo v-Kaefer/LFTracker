@@ -1,9 +1,10 @@
 import subprocess
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QListWidget,
-    QFrame, QScrollArea, QMainWindow, QHBoxLayout, QComboBox
+    QFrame, QScrollArea, QMainWindow, QHBoxLayout, QComboBox, QProgressBar
 )
 from PyQt5.QtCore import Qt
+
 
 # Map example: packages -> sectors
 SECTOR_MAP = {
@@ -36,6 +37,36 @@ def get_reverse_dependencies(package_name):
 
 def classify_package(package):
     return SECTOR_MAP.get(package, "Others")
+
+def get_total_package_size():
+    try:
+        result = subprocess.run(
+            ["expac", "-H", "M", "%k"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True
+        )
+        total = sum(float(line) for line in result.stdout.strip().splitlines())
+        return f"{total:.2f} MB"
+    except Exception:
+        return "?? MB"
+
+def get_sector_package_size(pkg_names):
+    try:
+        result = subprocess.run(
+            ["expac", "-H", "M", "%n %k"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True
+        )
+        size_map = dict()
+        for line in result.stdout.strip().splitlines():
+            name, size = line.split()
+            size_map[name] = float(size)
+        total = sum(size_map.get(pkg, 0) for pkg in pkg_names)
+        return f"{total:.2f} MB"
+    except Exception:
+        return "?? MB"
 
 
 class DependencyWidget(QFrame):
@@ -100,6 +131,10 @@ class MainWindow(QMainWindow):
         # HEADER
         self.header_layout = QHBoxLayout()
         self.package_count_label = QLabel("📦 Packages Found: 0")
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setFixedHeight(12)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setMaximum(100)
         self.sector_selector = QComboBox()
         self.sector_selector.addItems(["All", "Media", "Network", "System", "Development", "Others"])
         self.sector_selector.currentTextChanged.connect(self.update_display)
@@ -109,6 +144,7 @@ class MainWindow(QMainWindow):
         self.header_layout.addWidget(QLabel("Filter:"))
         self.header_layout.addWidget(self.sector_selector)
         self.main_layout.addLayout(self.header_layout)
+        self.main_layout.addWidget(self.progress_bar)
 
         # SCROLL AREA
         self.scroll_area = QScrollArea()
@@ -136,18 +172,46 @@ class MainWindow(QMainWindow):
 
         self.all_packages = sector_data
         self.total_count = sum(len(widgets) for widgets in sector_data.values())
-        self.package_count_label.setText(f"📦 Packages Found: {self.total_count}")
+        self.total_size = get_total_package_size()
+
+        try:
+            self.full_size = float(get_total_package_size().split()[0])
+        except:
+            self.full_size = 1.0
+
+
 
 
     def update_display(self):
         selected_sector = self.sector_selector.currentText()
+
+        # Clear current layout
         for i in reversed(range(self.scroll_layout.count())):
             widget = self.scroll_layout.itemAt(i).widget()
             if widget:
                 widget.setParent(None)
 
+        displayed_packages = []
+
+        # Rebuild sector groups
         for sector, data_list in self.all_packages.items():
             if selected_sector == "All" or selected_sector == sector:
                 widgets = [DependencyWidget(pkg, deps) for pkg, deps in data_list]
                 group = SectorGroup(sector, widgets)
                 self.scroll_layout.addWidget(group)
+                displayed_packages.extend(pkg for pkg, _ in data_list)
+
+        # Update header info
+        count = len(displayed_packages)
+        size = get_sector_package_size(displayed_packages)
+        print("DEBUG:", repr(size))
+        self.package_count_label.setText(f"📦 Packages Found: {count} | 💾 Space used: {size}")
+
+        # Space bar
+        try:
+            used = float(size.split()[0])
+            percent = int((used / self.full_size) * 100)
+            self.progress_bar.setValue(percent)
+        except Exception as e:
+            print("Erro ao calcular barra de espaço:", e)
+            self.progress_bar.setValue(0)
