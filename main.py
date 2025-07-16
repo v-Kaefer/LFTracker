@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import sys
 sys.path.insert(0, "/usr/share/lftracker")
-
+import shutil
 from ui import MainWindow
 from PyQt5.QtWidgets import QApplication
 

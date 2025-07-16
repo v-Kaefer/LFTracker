@@ -1,3 +1,4 @@
+import os
 import subprocess
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QPushButton, QListWidget,
@@ -39,34 +40,41 @@ def classify_package(package):
     return SECTOR_MAP.get(package, "Others")
 
 def get_total_package_size():
+    packages = get_installed_packages()
+    total = sum(get_installed_size_raw(pkg) for pkg in packages)
+    return f"{total:.2f} MB"
+
+def get_installed_size_raw(package):
     try:
-        result = subprocess.run(
-            ["expac", "-H", "M", "%k"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True
-        )
-        total = sum(float(line) for line in result.stdout.strip().splitlines())
+        base = f"/var/lib/pacman/local/{package}"
+        if not os.path.exists(base):
+            # Tenta encontrar versão do pacote
+            entries = [d for d in os.listdir("/var/lib/pacman/local") if d.startswith(package + "-")]
+            if entries:
+                base = f"/var/lib/pacman/local/{entries[0]}"
+            else:
+                return 0.0
+
+        desc_path = os.path.join(base, "desc")
+        with open(desc_path, "r") as f:
+            lines = f.readlines()
+            for i, line in enumerate(lines):
+                if line.strip() == "%SIZE%":
+                    size_bytes = int(lines[i+1].strip())
+                    return size_bytes / (1024 * 1024)  # Convert to MB
+        return 0.0
+    except Exception as e:
+        print(f"[ERROR] Failed to get size of {package}: {e}")
+        return 0.0
+
+
+def get_sector_package_size(pkg_names):
+    try:
+        total = sum(get_installed_size_raw(pkg) for pkg in pkg_names)
         return f"{total:.2f} MB"
     except Exception:
         return "?? MB"
 
-def get_sector_package_size(pkg_names):
-    try:
-        result = subprocess.run(
-            ["expac", "-H", "M", "%n %k"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.DEVNULL,
-            text=True
-        )
-        size_map = dict()
-        for line in result.stdout.strip().splitlines():
-            name, size = line.split()
-            size_map[name] = float(size)
-        total = sum(size_map.get(pkg, 0) for pkg in pkg_names)
-        return f"{total:.2f} MB"
-    except Exception:
-        return "?? MB"
 
 
 class DependencyWidget(QFrame):
@@ -172,11 +180,16 @@ class MainWindow(QMainWindow):
 
         self.all_packages = sector_data
         self.total_count = sum(len(widgets) for widgets in sector_data.values())
-        self.total_size = get_total_package_size()
 
+        # Get and convert total size (KB → MB)
+        total_str = get_total_package_size()
         try:
-            self.full_size = float(get_total_package_size().split()[0])
-        except:
+            self.full_size = float(total_str.split()[0])
+            if self.full_size == 0:
+                print("⚠️ Total size returned is 0. Changing to 1.0 to prevent div by zero.")
+                self.full_size = 1.0
+        except Exception as e:
+            print("Error converting total_size:", e)
             self.full_size = 1.0
 
 
@@ -213,5 +226,5 @@ class MainWindow(QMainWindow):
             percent = int((used / self.full_size) * 100)
             self.progress_bar.setValue(percent)
         except Exception as e:
-            print("Erro ao calcular barra de espaço:", e)
+            print("Error calculating size bar:", e)
             self.progress_bar.setValue(0)
